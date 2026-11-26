@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Kukai Store</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Jost:wght@300;400;500&family=Caveat:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* VOICE: hushed late-night boutique with an edgy cashier — private, warm, a little cheeky
+   IDEA: a side-scrolling shop seen through a long lens, like an illustrated store front
+   PICTURE: the 3D store, full screen; floor plan strip on top shows where you are
+   COLOUR and TYPE: deep wine room, blush light, brass trim, neon pink accents; Marcellus + Jost
+   LAYOUT: brand + map + bag on top; walk arrows at the sides; product sheet slides in from the right (full screen on phones) */
+:root{--wine:#2a0f17;--ink:#f7ebe8;--mut:#cdb3b3;--blush:#e9a8b2;--brass:#c9a46a;--neon:#ff5fa2;--glass:rgba(26,9,15,.92)}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%;background:#14070b;color:var(--ink);font:16px/1.5 Jost,system-ui,sans-serif;overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#c.grabbing{cursor:grabbing}#c.point{cursor:pointer}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--blush);outline-offset:2px}
+.top{position:fixed;top:0;left:0;right:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;padding:12px max(14px,2vw);z-index:4;pointer-events:none}
+.top>*{pointer-events:auto}
+.brand{font:22px Marcellus,serif;letter-spacing:.12em;padding-top:8px}
+.acts{display:flex;gap:8px}
+.pill{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid rgba(233,168,178,.3);background:rgba(20,7,11,.62);backdrop-filter:blur(10px);font-weight:500;font-size:15px}
+.pill b{display:inline-grid;place-items:center;min-width:22px;height:22px;margin-left:6px;border-radius:11px;background:var(--blush);color:var(--wine);font-size:13px}
+.map{justify-self:center;width:min(560px,100%);background:rgba(20,7,11,.62);backdrop-filter:blur(12px);border:1px solid rgba(233,168,178,.2);border-radius:16px;padding:6px 8px 4px}
+.map svg{display:block;width:100%;height:auto;overflow:visible}
+.map .zone{cursor:pointer}
+.map .zone text{fill:#bfa3a6;font:500 14px Jost,sans-serif;text-anchor:middle;transition:fill .3s}
+.map .zone .bar{fill:rgba(233,168,178,.18);transition:fill .3s}
+.map .zone.on text{fill:#fff}.map .zone.on .bar{fill:var(--blush)}
+.map .zone:hover text{fill:#fff}
+.arrow{position:fixed;top:50%;width:64px;height:64px;margin-top:-32px;border-radius:50%;border:1px solid rgba(233,168,178,.35);background:rgba(20,7,11,.55);backdrop-filter:blur(10px);display:grid;place-items:center;z-index:4;touch-action:none;transition:background .2s,transform .2s}
+.arrow:active,.arrow.held{background:var(--blush);transform:scale(.94)}
+.arrow svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.arrow:active svg,.arrow.held svg{stroke:var(--wine)}
+#goL{left:max(12px,1.6vw)}#goR{right:max(12px,1.6vw)}
+.front{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:4}
+.hint{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;font-size:13.5px;color:var(--mut);background:rgba(20,7,11,.55);padding:7px 16px;border-radius:999px;white-space:nowrap;pointer-events:none;z-index:3;max-width:calc(100vw - 180px);overflow:hidden;text-overflow:ellipsis}
+.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,95,162,.7)}50%{box-shadow:0 0 0 16px rgba(255,95,162,0)}}
+.bubble{position:fixed;z-index:6;left:0;top:0;transform:translate(-50%,-100%);background:#fff4f6;color:#2a0f17;border:2px solid #1a0910;border-radius:18px;padding:10px 16px;font:500 16px/1.35 Jost,sans-serif;box-shadow:4px 4px 0 #1a0910;max-width:min(320px,80vw);cursor:pointer}
+.bubble::after{content:"";position:absolute;left:var(--tail,50%);bottom:-12px;width:18px;height:18px;background:#fff4f6;border-right:2px solid #1a0910;border-bottom:2px solid #1a0910;transform:translateX(-50%) rotate(45deg) skew(8deg,8deg)}
+.bubble.pop{animation:pop .35s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pop{from{transform:translate(-50%,-80%) scale(.4);opacity:0}}
+.bubble .row{display:flex;gap:8px;margin-top:10px}
+.bubble .row button{min-height:40px;padding:0 16px;border-radius:999px;border:2px solid #1a0910;background:#fff;font-weight:500;font-size:14px;color:#2a0f17}
+.bubble .row button.yes{background:#ff5fa2;color:#fff}
+.ring{position:fixed;z-index:5;width:86px;height:86px;margin:-43px 0 0 -43px;border-radius:50%;border:3px solid var(--neon);pointer-events:none;animation:pulse 1.4s infinite}
+.drag-demo{position:fixed;left:50%;top:52%;z-index:5;width:150px;height:6px;margin-left:-75px;border-radius:3px;background:linear-gradient(90deg,transparent,rgba(255,95,162,.8),transparent);pointer-events:none}
+.drag-demo::after{content:"";position:absolute;top:-17px;left:0;width:40px;height:40px;border-radius:50%;border:3px solid #fff;background:rgba(255,95,162,.35);animation:slide 1.6s ease-in-out infinite alternate}
+@keyframes slide{to{left:110px}}
+.tip{position:fixed;z-index:6;pointer-events:none;background:rgba(20,7,11,.9);border:1px solid rgba(233,168,178,.25);padding:6px 12px;border-radius:10px;font-size:14px;white-space:nowrap}
+[hidden]{display:none!important}
+.sheet{position:fixed;top:0;right:0;bottom:0;width:clamp(380px,44vw,640px);background:var(--glass);backdrop-filter:blur(18px);border-left:1px solid rgba(233,168,178,.2);z-index:8;display:flex;flex-direction:column;overflow-y:auto;user-select:text}
+.sheet:not([hidden]){animation:sheet .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheet{from{transform:translateX(60px);opacity:0}}
+.shead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;position:sticky;top:0;z-index:2;background:linear-gradient(var(--glass) 70%,transparent)}
+.ghostb{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:transparent;font-size:15px}
+.viewer{position:relative;flex:none;height:min(48vh,440px);margin:0 16px;border-radius:18px;overflow:hidden;background:radial-gradient(90% 80% at 50% 40%,#4a1d2b,#1a080e)}
+.viewer canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+.vbar{position:absolute;left:12px;right:12px;bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--mut);pointer-events:none}
+.vbar button{pointer-events:auto;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid rgba(233,168,178,.4);background:rgba(20,7,11,.6);font-size:14px}
+.vbar button.on{background:var(--blush);color:var(--wine)}
+.info{padding:18px 22px 28px}
+.info h2,.co h2{font:400 32px/1.1 Marcellus,serif;margin:2px 0 6px;text-wrap:balance}
+.cat{margin:0;color:var(--blush);font-size:14px}
+.price{font:400 28px Marcellus,serif;color:var(--brass);margin:0 0 12px}
+.stock{font-size:14px;color:var(--mut)}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.1);margin:6px 0 14px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--blush);border-radius:3px}
+.dims{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 14px}
+.dims div{background:rgba(201,164,106,.12);border-radius:12px;padding:8px 10px;font-size:13px;color:#d8c3a5}
+.dims b{display:block;font:400 19px Marcellus,serif;color:#f1dfc3;white-space:nowrap}
+.info p{margin:0 0 12px}
+.buy{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;margin-top:16px}
+.qty{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
+.qty button{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:transparent;font-size:18px}
+.primary{min-height:50px;width:100%;border-radius:999px;border:0;background:var(--blush);color:var(--wine);font-weight:500;font-size:16px}
+.primary:disabled{opacity:.45;cursor:default}
+.secondary{min-height:48px;width:100%;margin-top:10px;border-radius:999px;border:1px solid var(--blush);background:transparent;color:var(--blush);font-weight:500;font-size:15px}
+.note{font-size:13px;color:var(--mut)}
+.co{padding:4px 22px 28px}
+.tabs{display:flex;gap:4px;margin:4px 0 16px;flex-wrap:wrap}
+.tabs button{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:transparent;font-size:14.5px;color:var(--mut)}
+.tabs button.on{background:var(--ink);color:var(--wine);border-color:var(--ink)}
+.line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:15px}
+.line .qty button{width:32px;height:32px;font-size:15px}
+.amt{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.total{display:flex;justify-content:space-between;font:400 21px Marcellus,serif;margin:16px 0}
+.sheet a{color:var(--blush)}
+#gate{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:20px;background:radial-gradient(120% 90% at 50% 30%,rgba(60,18,30,.88),rgba(14,5,8,.97));overflow:auto}
+.card{width:min(520px,100%);text-align:center}
+.card h1{font:400 clamp(44px,9vw,72px)/1 Marcellus,serif;letter-spacing:.14em;margin:0 0 8px}
+.card .lede{color:var(--mut);font-size:17px;margin:0 auto 26px;max-width:40ch}
+.go{display:grid;gap:10px;max-width:360px;margin:0 auto}
+.fine{font-size:13px;color:#a98f92;margin-top:20px}
+.toast{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:12;background:#fff4f6;color:#2a0f17;border:2px solid #1a0910;box-shadow:4px 4px 0 #1a0910;border-radius:14px;padding:10px 16px;font-size:15px;max-width:calc(100vw - 24px)}
+#cover{position:fixed;inset:0;z-index:20;background:#f2f1ee;color:#555;display:grid;place-items:center;font:15px system-ui,sans-serif;cursor:pointer}
+@media(max-width:700px){
+ .top{grid-template-columns:minmax(0,1fr) auto;padding:10px}
+ .map{grid-column:1/-1;grid-row:2;width:100%}
+ .brand{padding-top:6px}
+ .arrow{top:auto;bottom:16px;margin-top:0;width:60px;height:60px}
+ .front{bottom:24px}
+ .hint{bottom:88px;max-width:calc(100vw - 24px);font-size:12.5px}
+ .sheet{width:100%;border-left:0}
+ .viewer{height:42vh}
+ .info h2,.co h2{font-size:27px}
+ .map .zone text{font-size:19px}
+}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Kukai 3D store"></canvas>
+<header class="top">
+ <div class="brand">KUKAI</div>
+ <nav class="map" id="map" aria-label="Store floor plan"></nav>
+ <div class="acts">
+  <button class="pill" id="bagBtn">Bag<b id="bagN">0</b></button>
+  <button class="pill" id="hideBtn" title="Quick hide (Q)">Hide</button>
+ </div>
+</header>
+<button class="arrow" id="goL" aria-label="Walk left"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+<button class="arrow" id="goR" aria-label="Walk right"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+<button class="pill front" id="frontBtn" hidden>Face front</button>
+<div class="hint" id="hint" hidden></div>
+<div class="tip" id="tip" hidden></div>
+<div class="bubble" id="bubble" hidden></div>
+<div class="ring" id="ring" hidden></div>
+<div class="drag-demo" id="dragDemo" hidden></div>
+
+<aside class="sheet" id="sheet" hidden>
+ <div class="shead"><button class="ghostb" id="backBtn">← Back to the store</button><button class="ghostb" id="toCheckout">Bag · <span id="bagN2">0</span></button></div>
+ <div data-view="product">
+  <div class="viewer"><canvas id="vc"></canvas>
+   <div class="vbar"><span id="vHint">Drag to turn · grid squares are 5 cm</span><button id="motionBtn" hidden>Preview motion</button></div>
+  </div>
+  <div class="info">
+   <p class="cat" id="pCat"></p>
+   <h2 id="pName"></h2>
+   <p class="price" id="pPrice"></p>
+   <div class="stock"><span id="pStock"></span><div class="bar"><i id="pBar"></i></div></div>
+   <div class="dims" id="pDims"></div>
+   <p id="pDesc"></p>
+   <p class="note" id="pSize"></p>
+   <div class="buy">
+    <div class="qty"><button id="qMinus" aria-label="One fewer">−</button><span id="qN">1</span><button id="qPlus" aria-label="One more">+</button></div>
+    <button class="primary" id="addBtn">Add to bag</button>
+   </div>
+   <button class="secondary" id="buyNow">Buy now</button>
+   <p class="note">Sample listing for the preview — swap in the real catalogue.</p>
+  </div>
+ </div>
+ <div data-view="checkout" class="co" hidden>
+  <div class="tabs" role="tablist"><button data-tab="bag">Bag</button><button data-tab="about">About</button><button data-tab="contact">Contact</button></div>
+  <section data-pane="bag">
+   <h2>Your bag</h2>
+   <div id="bagList"></div>
+   <div class="total"><span>Total</span><span id="bagTotal">₹0</span></div>
+   <button class="primary" id="placeBtn">Place order</button>
+   <p class="note" id="placeNote">Checkout is a preview — payments connect when the store goes live.</p>
+  </section>
+  <section data-pane="about" hidden>
+   <h2>About Kukai</h2>
+   <p>Kukai is an intimate-wellness brand for adults. Pleasure, wellness, massage and grooming — made to be beautiful enough to keep on a shelf, and private enough to buy without a second thought.</p>
+   <p>Walk the store at your own pace and see every product at its real size before it reaches your door.</p>
+   <p class="note">Sample copy for the preview.</p>
+  </section>
+  <section data-pane="contact" hidden><h2>Contact</h2><div id="contactBody"></div></section>
+ </div>
+</aside>
+
+<div id="gate">
+ <div class="card">
+  <h1>KUKAI</h1>
+  <p class="lede">A private store. Walk the shelves, pick anything up, see it at its real size. Nobody’s watching — well, almost nobody.</p>
+  <div class="go">
+   <button class="primary" id="tourBtn" disabled>Setting up the store…</button>
+   <button class="ghostb" id="skipBtn" disabled>I’m 18+ — skip the tour</button>
+   <button class="ghostb" id="leaveBtn">Not now</button>
+  </div>
+  <p class="fine">For adults 18+. Preview build — products, prices and stock are samples.</p>
+  <p class="fine" id="gateNote" hidden>store.glb didn’t load. Open this page from GitHub Pages or a local server (python -m http.server), or drop your store.glb onto this page.</p>
+ </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div id="cover" hidden>Paused. Click anywhere or press Q to return.</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<script src="store-data.js" onerror="void 0"></script>
+<script>
+(async()=>{
+/* ================= Edit these ================= */
+const CONFIG={site:'https://kukai.online',siteLabel:'kukai.online',email:'',whatsapp:'',instagram:''};
+/* The store itself lives in store.glb — open it in Blender, edit, export, replace. Naming rules are in the README. */
+const MODELS={
+ store:'store.glb',
+ cashier:'',    // e.g. 'models/cashier.glb' rigged, clips Idle, Notice, Point; head bone named Head
+ products:{}    // e.g. {p1:'models/p1.glb'} origin at the base centre, real size
+};
+/* Sections: the key matches zone_<key> and sign_<key>__style in the .glb */
+const CATS={
+ checkout:{name:'Checkout',sub:'pay here · ask anything',neon:'#ff5fa2'},
+ pleasure:{name:'Pleasure',sub:'Personal massagers',neon:'#ff5fa2'},
+ wellness:{name:'Wellness',sub:'Supplements & care',neon:'#ffc87a'},
+ massage:{name:'Massage',sub:'Oils, candles & tools',neon:'#ffb08a'},
+ grooming:{name:'Grooming',sub:'Trim & care',neon:'#a6b8ff'}
+};
+/* Extra signs: sign_<key>__<neon|led|board|chalk|logo> */
+const SIGN_TEXT={open:['open late',''],offer:['Special offer','this week only'],end:['ask at the counter ←',''],counter:['KUKAI','Checkout'],nojudge:['no judgement','']};
+/* Products: id matches hang_<id> or stand_<id> in the .glb */
+const PRODUCTS=[
+ {id:'p1',cat:'pleasure',kind:'wand',name:'Silk Wand Massager',price:4990,stock:8,color:0xe7a1ad,size:'Body-safe silicone · USB charging',desc:'A full-size wand with a soft, flexible neck and a deep, rumbly motor.'},
+ {id:'p2',cat:'pleasure',kind:'bullet',name:'Petite Bullet',price:1490,stock:14,color:0xdcc6a6,size:'Ten patterns · one button',desc:'Small enough for a pocket, strong enough to surprise.'},
+ {id:'p3',cat:'pleasure',kind:'arc',name:'Contour Arc',price:3290,stock:5,color:0x7a2e55,size:'Waterproof · whisper-quiet',desc:'A gently curved massager shaped to reach easily.'},
+ {id:'p4',cat:'pleasure',kind:'ring',name:'Duo Comfort Ring',price:990,stock:20,color:0x26201f,size:'Stretches to fit',desc:'Soft, stretchy and made for two. Easy to clean, easy to share.'},
+ {id:'p5',cat:'pleasure',kind:'pebble',name:'Pebble Palm Massager',price:2490,stock:2,color:0xefb7a4,size:'Fits the palm',desc:'A smooth, palm-sized pebble with broad, even vibrations. Lovely as a first massager.'},
+ {id:'p6',cat:'pleasure',kind:'egg',name:'Whisper Egg',price:1790,stock:0,color:0x9b5d86,size:'With slim remote',desc:'A discreet wearable with a slim remote. Back in stock soon.'},
+ {id:'w1',cat:'wellness',kind:'bottle',name:'Daily Vitality',price:899,stock:24,color:0xc9a46a,size:'60 capsules',desc:'A daily herbal blend for energy and wellbeing. Two capsules with breakfast.'},
+ {id:'w2',cat:'wellness',kind:'bottle',name:'Desire Blend for Her',price:1099,stock:12,color:0xe39aa8,size:'60 capsules',desc:'A botanical blend made for women’s wellness, with shatavari and saffron.'},
+ {id:'w3',cat:'wellness',kind:'bottle',name:'Stamina Blend for Him',price:1099,stock:9,color:0x5d2a46,size:'60 capsules',desc:'A botanical blend made for men’s wellness, with ashwagandha and safed musli.'},
+ {id:'w4',cat:'wellness',kind:'jar',name:'Calm Night Gummies',price:749,stock:3,color:0x8f7ab8,size:'30 gummies',desc:'Berry gummies for winding down. One before bed.'},
+ {id:'w5',cat:'wellness',kind:'tube',name:'Silk Glide Gel',price:599,stock:30,color:0xf2e6ea,size:'100 ml',desc:'Water-based, fragrance-free and condom-friendly. A little goes a long way.'},
+ {id:'w6',cat:'wellness',kind:'bottle',name:'Balance Probiotic',price:999,stock:16,color:0x7fae9a,size:'30 capsules',desc:'A daily probiotic blend made for intimate balance.'},
+ {id:'m1',cat:'massage',kind:'dropper',name:'Sandalwood Massage Oil',price:1290,stock:11,color:0xc9a46a,size:'50 ml',desc:'Cold-pressed oils warmed with Mysore sandalwood. Absorbs without stickiness.'},
+ {id:'m2',cat:'massage',kind:'candle',name:'Rose Massage Candle',price:1190,stock:6,color:0xf1c9c9,size:'150 g',desc:'Lights like a candle, melts into a warm massage oil.'},
+ {id:'m3',cat:'massage',kind:'roller',name:'Jade Roller',price:890,stock:10,color:0x2f3b33,size:'Keep it in the fridge',desc:'A cool jade roller for face and body.'},
+ {id:'m4',cat:'massage',kind:'stones',name:'Warm Stone Set',price:1490,stock:4,color:0x2a2a2c,size:'Three basalt stones',desc:'Smooth stones that hold warmth for long, slow massages.'},
+ {id:'m5',cat:'massage',kind:'spray',name:'Jasmine Body Oil',price:1590,stock:7,color:0xe8d7a8,size:'100 ml',desc:'A light, dry-touch body oil with night jasmine.'},
+ {id:'m6',cat:'massage',kind:'bar',name:'Cocoa Massage Bar',price:490,stock:18,color:0xead8c0,size:'80 g',desc:'A solid bar that melts at skin temperature. Cocoa butter and vanilla.'},
+ {id:'g1',cat:'grooming',kind:'trimmer',name:'Precision Bikini Trimmer',price:1890,stock:9,color:0xe9c7cc,size:'Two comb lengths · waterproof',desc:'A gentle trimmer with a skin-safe guard.'},
+ {id:'g2',cat:'grooming',kind:'trimmer',name:'Body Groomer',price:2290,stock:6,color:0x2b2d33,size:'90-minute battery',desc:'A body groomer with a hypoallergenic blade.'},
+ {id:'g3',cat:'grooming',kind:'razor',name:'Smooth Glide Razor',price:590,stock:22,color:0xc7b7a3,size:'Five blades · aloe strip',desc:'A weighted razor that glides.'},
+ {id:'g4',cat:'grooming',kind:'kit',name:'Grooming Kit Box',price:2990,stock:3,color:0x3a1a26,size:'Gift-ready box',desc:'Trimmer, razor, mist and pouch in one box.'},
+ {id:'g5',cat:'grooming',kind:'spray',name:'After-Shave Calm Mist',price:690,stock:12,color:0xa9c3d6,size:'100 ml · alcohol-free',desc:'Cools and calms freshly groomed skin.'},
+ {id:'g6',cat:'grooming',kind:'pouch',name:'Travel Trim Pouch',price:1290,stock:5,color:0x8a6f62,size:'Water-resistant',desc:'A soft pouch for your grooming kit.'}
+];
+/* ============================================== */
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rupee=n=>'₹'+Number(n).toLocaleString('en-IN');
+const touchUI=matchMedia('(pointer:coarse)').matches;
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const smooth=x=>{x=clamp(x,0,1);return x*x*(3-2*x)};
+const PROD={};PRODUCTS.forEach(p=>{PROD[p.id]=p});
+
+if(!window.THREE){$('#tourBtn').textContent='Could not load 3D — check your connection';return}
+
+/* ---------- renderer ---------- */
+const canvas=$('#c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,touchUI?1.6:1.8));
+renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x14070b);scene.fog=new THREE.Fog(0x14070b,14,34);
+const camera=new THREE.PerspectiveCamera(28,1,.05,80);camera.rotation.order='YXZ';
+const UP=new THREE.Vector3(0,1,0);
+const aniso=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+scene.add(new THREE.HemisphereLight(0xffe6dc,0x2a0f17,.6));
+
+/* ---------- helpers ---------- */
+const V2=(x,y)=>new THREE.Vector2(x,y);
+const mat=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.38,metalness:0},o||{}));
+const glowM=c=>new THREE.MeshBasicMaterial({color:c,toneMapped:false});
+const METAL=mat(0xd8ad8e,{metalness:.85,roughness:.28}),BRASS=mat(0xc9a46a,{metalness:.8,roughness:.32}),DARK=mat(0x1b1416,{roughness:.5});
+const lathe=(pts,m,seg)=>new THREE.Mesh(new THREE.LatheGeometry(pts.map(p=>V2(p[0],p[1])),seg||28),m);
+const cyl=(rt,rb,h,m,seg,open)=>new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg||24,1,!!open),m);
+const box=(w,h,d,m)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+const sph=(r,m)=>new THREE.Mesh(new THREE.SphereGeometry(r,24,16),m);
+const at=(o,x,y,z)=>{o.position.set(x,y,z);return o};
+function rrect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+const TEXS=[];
+function tex(w,h,draw,flip){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');draw(g,w,h);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=aniso;if(flip===false)t.flipY=false;TEXS.push({g,w,h,draw,t});return t}
+const plane=(w,h,t)=>new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:t,transparent:true,toneMapped:false}));
+function fit(g,text,font,size,max){let s=size;do{g.font=font.replace('#',s);s-=2}while(g.measureText(text).width>max&&s>10)}
+function measure(o){const b=new THREE.Box3().setFromObject(o);return {b,s:b.getSize(new THREE.Vector3())}}
+const baseName=n=>(n||'').replace(/\.\d+$/,'');
+
+/* ---------- models ---------- */
+const loader=THREE.GLTFLoader?new THREE.GLTFLoader():null;
+const loadGLB=url=>new Promise(res=>{if(!url||!loader)return res(null);loader.load(url,g=>res(g),undefined,()=>{console.warn('Model failed:',url);res(null)})});
+const parseGLB=buf=>new Promise(res=>{loader.parse(buf,'',g=>res(g),()=>res(null))});
+const PRODUCT_GLB={};
+await Promise.all(Object.entries(MODELS.products).map(async([id,url])=>{const g=await loadGLB(url);if(g)PRODUCT_GLB[id]=g.scene}));
+
+const BUILD={
+ wand(p){const g=new THREE.Group(),m=mat(p.color,{roughness:.32});
+  g.add(lathe([[0,0],[.015,.002],[.018,.02],[.018,.19],[.015,.215],[.012,.232],[.02,.244],[.031,.262],[.034,.285],[.029,.306],[.017,.316],[0,.319]],m));
+  const r=new THREE.Mesh(new THREE.TorusGeometry(.0182,.0022,8,32),METAL);r.rotation.x=Math.PI/2;r.position.y=.19;g.add(r);
+  g.add(at(box(.008,.02,.004,METAL),0,.13,.018));return g},
+ bullet(p){const g=new THREE.Group();g.add(lathe([[0,0],[.007,.001],[.0095,.008],[.0095,.058],[.008,.07],[.005,.077],[0,.079]],mat(p.color,{roughness:.3})));
+  const r=new THREE.Mesh(new THREE.TorusGeometry(.0097,.0015,8,24),METAL);r.rotation.x=Math.PI/2;r.position.y=.012;g.add(r);return g},
+ arc(p){const g=new THREE.Group(),m=mat(p.color,{roughness:.32});
+  const c=new THREE.CatmullRomCurve3([new THREE.Vector3(0,.015,0),new THREE.Vector3(0,.07,.004),new THREE.Vector3(.008,.125,.02),new THREE.Vector3(.025,.16,.04)]);
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(c,40,.014,16,false),m));g.add(at(sph(.014,m),0,.015,0));const e=c.getPoint(1);g.add(at(sph(.017,m),e.x,e.y,e.z));return g},
+ ring(p){const g=new THREE.Group(),m=mat(p.color,{roughness:.4});g.add(at(new THREE.Mesh(new THREE.TorusGeometry(.024,.008,16,40),m),0,.032,0));g.add(at(sph(.009,m),0,.064,0));return g},
+ pebble(p){const g=new THREE.Group(),s=sph(.05,mat(p.color,{roughness:.3}));s.scale.set(.7,1,.42);g.add(at(s,0,.05,0));const d=cyl(.006,.006,.003,METAL);d.rotation.x=Math.PI/2;g.add(at(d,0,.06,.021));return g},
+ egg(p){const g=new THREE.Group(),m=mat(p.color,{roughness:.3}),s=sph(.03,m);s.scale.set(.85,1.2,.85);g.add(at(s,0,.036,0));g.add(at(cyl(.0016,.0016,.05,m,8),0,.095,0));g.add(at(sph(.005,m),0,.122,0));return g},
+ bottle(p){const g=new THREE.Group();g.add(lathe([[0,0],[.028,0],[.032,.004],[.032,.1],[.027,.112],[.015,.118],[.015,.124],[0,.124]],mat(0xf3eee9,{roughness:.45})));
+  g.add(at(cyl(.0322,.0322,.06,mat(p.color,{roughness:.6}),32,true),0,.052,0));g.add(at(cyl(.016,.016,.022,DARK),0,.135,0));return g},
+ jar(p){const g=new THREE.Group();g.add(lathe([[0,0],[.042,0],[.046,.004],[.046,.07],[.04,.078],[0,.078]],mat(0xf3eee9,{roughness:.45})));
+  g.add(at(cyl(.0462,.0462,.04,mat(p.color,{roughness:.6}),32,true),0,.036,0));g.add(at(cyl(.044,.044,.024,mat(p.color,{roughness:.35})),0,.09,0));return g},
+ tube(p){const g=new THREE.Group();g.add(at(cyl(.017,.017,.028,DARK),0,.014,0));const b=lathe([[0,0],[.019,0],[.02,.01],[.02,.1],[.016,.128],[0,.133]],mat(p.color,{roughness:.4}));b.scale.z=.55;g.add(at(b,0,.028,0));g.add(at(box(.036,.01,.008,mat(p.color,{roughness:.4})),0,.158,0));return g},
+ dropper(p){const g=new THREE.Group();g.add(lathe([[0,0],[.022,0],[.024,.004],[.024,.06],[.017,.072],[.009,.076],[.009,.082],[0,.082]],mat(0x8a4a1c,{roughness:.15,transparent:true,opacity:.85})));
+  g.add(at(cyl(.0243,.0243,.03,mat(p.color,{roughness:.6}),32,true),0,.032,0));g.add(at(cyl(.011,.011,.016,DARK),0,.089,0));const b=sph(.01,DARK);b.scale.y=1.5;g.add(at(b,0,.106,0));return g},
+ candle(p){const g=new THREE.Group();g.add(at(cyl(.045,.045,.055,mat(0xb9a58f,{metalness:.7,roughness:.35}),32),0,.0275,0));
+  g.add(at(cyl(.0455,.0455,.026,mat(0xf6efe6,{roughness:.8}),32,true),0,.026,0));g.add(at(cyl(.042,.042,.004,mat(p.color,{roughness:.7}),32),0,.056,0));
+  g.add(at(cyl(.0012,.0012,.012,DARK,6),0,.063,0));const f=at(new THREE.Mesh(new THREE.ConeGeometry(.006,.022,12),glowM(0xffc07a)),0,.08,0);f.name='flame';g.add(f);return g},
+ roller(p){const g=new THREE.Group(),m=mat(p.color,{roughness:.4});g.add(at(cyl(.0075,.0075,.1,m),0,.05,0));
+  g.add(at(box(.004,.03,.004,METAL),-.03,.112,0));g.add(at(box(.004,.03,.004,METAL),.03,.112,0));g.add(at(box(.064,.004,.004,METAL),0,.098,0));
+  const r=cyl(.013,.013,.05,mat(0x8fbfa0,{roughness:.15,transparent:true,opacity:.9}));r.rotation.z=Math.PI/2;r.name='spin';g.add(at(r,0,.125,0));return g},
+ stones(p){const g=new THREE.Group(),m=mat(p.color,{roughness:.65});g.add(at(box(.12,.012,.08,mat(0x7a5236,{roughness:.6})),0,.006,0));
+  [[.036,.027],[.03,.0546],[.024,.077]].forEach(([r,y],i)=>{const s=sph(r,m);s.scale.set(1,.42,.8);s.rotation.y=i*.7;g.add(at(s,0,y,0))});return g},
+ bar(p){const g=new THREE.Group();g.add(at(box(.085,.032,.055,mat(p.color,{roughness:.85})),0,.016,0));g.add(at(box(.087,.033,.018,mat(0x5a1f30,{roughness:.6})),0,.016,0));return g},
+ trimmer(p){const g=new THREE.Group(),b=lathe([[0,0],[.014,0],[.018,.01],[.019,.11],[.016,.135],[0,.14]],mat(p.color,{roughness:.35}));b.scale.z=.72;g.add(b);
+  g.add(at(box(.034,.012,.016,METAL),0,.142,0));g.add(at(box(.03,.003,.017,DARK),0,.149,0));const k=cyl(.006,.006,.003,METAL);k.rotation.x=Math.PI/2;g.add(at(k,0,.07,.0145));return g},
+ razor(p){const g=new THREE.Group();g.add(lathe([[0,0],[.006,0],[.0075,.01],[.0065,.1],[.008,.112],[0,.114]],mat(p.color,{roughness:.35,metalness:.3})));
+  g.add(at(box(.044,.012,.012,DARK),0,.12,0));g.add(at(box(.04,.003,.0125,METAL),0,.121,.001));return g},
+ kit(p){const g=new THREE.Group();g.add(at(box(.17,.11,.05,mat(p.color,{roughness:.6})),0,.055,0));g.add(at(box(.172,.004,.052,BRASS),0,.085,0));g.add(at(box(.016,.012,.004,BRASS),0,.078,.027));return g},
+ spray(p){const g=new THREE.Group();g.add(lathe([[0,0],[.019,0],[.021,.004],[.021,.11],[.016,.12],[.008,.124],[0,.124]],mat(0xeef0ee,{transparent:true,opacity:.88,roughness:.2})));
+  g.add(at(cyl(.0213,.0213,.045,mat(p.color,{roughness:.6}),32,true),0,.05,0));g.add(at(cyl(.008,.009,.02,mat(0xf4f4f2)),0,.134,0));g.add(at(box(.008,.006,.014,mat(0xf4f4f2)),0,.142,.006));return g},
+ pouch(p){const g=new THREE.Group();g.add(at(box(.16,.1,.035,mat(p.color,{roughness:.85})),0,.05,0));g.add(at(box(.15,.004,.037,METAL),0,.093,0));g.add(at(box(.006,.014,.004,METAL),.06,.086,.019));return g}
+};
+const ANIM={wand:'buzz',bullet:'buzz',arc:'buzz',ring:'buzz',pebble:'buzz',egg:'buzz',trimmer:'buzz',roller:'roll',candle:'flame'};
+const makeItem=p=>PRODUCT_GLB[p.id]?PRODUCT_GLB[p.id].clone(true):BUILD[p.kind](p);
+
+
+
+/* ---------- textures ---------- */
+function stockInfo(n){return n===0?['Sold out','#b0455a']:n<=3?[`Only ${n} left`,'#c27a2c']:[`${n} in stock`,'#3f7a58']}
+function tagTex(p){return tex(512,236,(g,w,h)=>{g.fillStyle='#f6ece8';rrect(g,4,4,w-8,h-8,22);g.fill();
+ g.fillStyle='#2a0f17';fit(g,p.name,'500 #px Jost',44,w-48);g.fillText(p.name,26,64);
+ g.font='400 54px Marcellus';g.fillStyle='#7a4f1e';g.fillText(rupee(p.price),26,140);
+ const [t,c]=stockInfo(p.stock);g.fillStyle=c;g.beginPath();g.arc(36,191,9,0,7);g.fill();g.font='500 34px Jost';g.fillText(t,56,203)})}
+function signDraw(style,title,sub,col){return (g,w,h)=>{
+ g.clearRect(0,0,w,h);g.textAlign='center';g.textBaseline='middle';const big=h*(sub?.46:.6),small=h*.2,ty=sub?h*.42:h*.52;
+ if(style==='neon'){g.font=`italic 400 ${big}px Marcellus`;fit(g,title,'italic 400 #px Marcellus',big,w*.92);g.shadowColor=col;[h*.12,h*.06,h*.02].forEach(b=>{g.shadowBlur=b;g.fillStyle=col;g.fillText(title,w/2,ty)});g.shadowBlur=0;g.fillStyle='#fff6fa';g.fillText(title,w/2,ty);
+  if(sub){g.font=`300 ${small}px Jost`;g.shadowColor=col;g.shadowBlur=h*.05;g.fillStyle=col;g.fillText(sub,w/2,h*.8)}return}
+ if(style==='led'){g.fillStyle='#0b0507';g.fillRect(0,0,w,h);fit(g,title,'500 #px Jost',big,w*.9);g.shadowColor=col;g.shadowBlur=h*.08;g.fillStyle=col;g.fillText(title,w/2,ty);
+  if(sub){g.font=`400 ${small}px Jost`;g.fillStyle='#ffd7e6';g.fillText(sub,w/2,h*.8)}g.shadowBlur=0;g.fillStyle='rgba(0,0,0,.45)';for(let x=0;x<w;x+=6)g.fillRect(x,0,2,h);for(let y=0;y<h;y+=6)g.fillRect(0,y,w,2);return}
+ if(style==='chalk'){g.fillStyle='#1e2420';g.fillRect(0,0,w,h);g.strokeStyle='#8a6a44';g.lineWidth=w*.03;g.strokeRect(0,0,w,h);g.fillStyle='#f3efe6';fit(g,title,'500 #px Caveat',Math.min(big,w*.3),w*.86);g.fillText(title,w/2,h*.3);
+  g.font=`400 ${Math.min(small*1.2,w*.1)}px Caveat`;g.fillStyle='#f7c6d4';(sub||'').split(' · ').forEach((l,i)=>g.fillText(l,w/2,h*.52+i*h*.12));g.strokeStyle='rgba(243,239,230,.6)';g.lineWidth=3;g.beginPath();g.moveTo(w*.2,h*.42);g.lineTo(w*.8,h*.42);g.stroke();return}
+ if(style==='logo'){g.fillStyle='#c9a46a';fit(g,title,'400 #px Marcellus',h*.55,w*.9);g.fillText(title,w/2,h*.4);g.font=`300 ${h*.17}px Jost`;g.fillStyle='#d9b9b4';g.fillText(sub,w/2,h*.82);return}
+ /* board */
+ g.fillStyle='#2a0f17';rrect(g,2,2,w-4,h-4,h*.12);g.fill();g.strokeStyle='#c9a46a';g.lineWidth=Math.max(3,h*.03);rrect(g,h*.06,h*.06,w-h*.12,h-h*.12,h*.08);g.stroke();
+ g.fillStyle='#f1dcd6';fit(g,title,'400 #px Marcellus',big,w*.85);g.fillText(title,w/2,ty);if(sub){g.font=`300 ${small}px Jost`;g.fillStyle='#d9b9b4';g.fillText(sub,w/2,h*.8)}}}
+
+/* ---------- cashier (placeholder until cashier.glb) ---------- */
+const grad=new THREE.DataTexture(new Uint8Array([70,150,255]),3,1,THREE.LuminanceFormat);grad.minFilter=grad.magFilter=THREE.NearestFilter;grad.generateMipmaps=false;grad.needsUpdate=true;
+const toon=c=>new THREE.MeshToonMaterial({color:c,gradientMap:grad});
+const INK=new THREE.MeshBasicMaterial({color:0x1a0910,side:THREE.BackSide});
+function ink(m,s){const o=new THREE.Mesh(m.geometry,INK);o.scale.setScalar(s||1.06);m.add(o);return m}
+function limb(a,b,r,m){const A=new THREE.Vector3(a[0],a[1],a[2]),B=new THREE.Vector3(b[0],b[1],b[2]);const c=cyl(r,r*.88,A.distanceTo(B),m,14);c.position.copy(A).add(B).multiplyScalar(.5);c.quaternion.setFromUnitVectors(UP,B.clone().sub(A).normalize());return ink(c,1.1)}
+const cashier=(()=>{
+ const g=new THREE.Group();g.position.set(1,0,1.05);scene.add(g);
+ const SK=toon(0xc48a6a),JK=toon(0x5b3ea8),YL=toon(0xf2c230),PK=toon(0xff6fae),DK=toon(0x231218),WH=toon(0xfafafa);
+ g.add(at(cyl(.2,.2,.06,DK),0,.72,0),at(cyl(.025,.025,.7,METAL),0,.36,0));
+ const torso=lathe([[0,0],[.16,0],[.18,.12],[.19,.3],[.21,.42],[.19,.49],[.09,.53],[0,.54]],JK,20);torso.scale.z=.68;ink(torso,1.04);g.add(at(torso,0,.76,0));
+ const band=cyl(.197,.197,.05,YL,20,true);band.scale.z=.69;g.add(at(band,0,1.06,0));
+ g.add(at(box(.012,.4,.01,WH),0,1.04,.135));
+ g.add(at(ink(cyl(.045,.05,.12,SK,12),1.1),0,1.33,0));
+ const head=new THREE.Group();head.rotation.order='YXZ';g.add(at(head,0,1.38,0));
+ const skull=sph(.105,SK);skull.scale.set(.88,1.08,.95);head.add(at(ink(skull,1.05),0,.11,0));
+ const hair=new THREE.Mesh(new THREE.SphereGeometry(.109,24,12,0,Math.PI*2,0,Math.PI*.42),PK);hair.scale.set(.9,1.08,.97);head.add(at(hair,0,.12,-.004));
+ const eyes=new THREE.Group();head.add(at(eyes,0,.115,.093));
+ [-1,1].forEach(sd=>{const e=sph(.012,DK);e.scale.set(1,1.3,.5);eyes.add(at(e,sd*.035,0,0));
+  const br=box(.036,.006,.006,DK);br.rotation.z=sd*-.18;head.add(at(br,sd*.036,.148,.097));
+  head.add(at(ink(sph(.022,SK),1.1),sd*.092,.1,0));const ring=new THREE.Mesh(new THREE.TorusGeometry(.016,.003,8,20),METAL);ring.rotation.y=Math.PI/2;head.add(at(ring,sd*.096,.066,0))});
+ head.add(at(sph(.012,SK),0,.085,.1),at(box(.03,.005,.004,toon(0x8a3040)),0,.052,.098));
+ const lolli=new THREE.Group();head.add(at(lolli,.02,.05,.1));lolli.add(limb([0,0,0],[.07,-.03,.08],.003,WH));lolli.add(at(ink(sph(.022,toon(0xff4f7b)),1.08),.08,-.035,.09));
+ const armL=new THREE.Group();g.add(at(armL,.2,1.24,0));
+ armL.add(limb([0,0,0],[.07,-.2,.28],.045,JK),limb([.07,-.2,.28],[-.1,-.2,.42],.04,JK),at(ink(sph(.045,JK),1.06),.07,-.2,.28),at(ink(sph(.04,SK),1.08),-.12,-.2,.43));
+ const armR=new THREE.Group();g.add(at(armR,-.2,1.24,0));
+ armR.add(limb([0,0,0],[-.04,-.19,.3],.045,JK),limb([-.04,-.19,.3],[.16,.13,.13],.04,JK),at(ink(sph(.045,JK),1.06),-.04,-.19,.3),at(ink(sph(.042,SK),1.08),.17,.15,.13));
+ g.add(at(box(.075,.008,.15,DK),.42,1.058,.42));g.add(at(box(.065,.002,.13,glowM(0x8fb3ff)),.42,1.063,.42));
+ g.traverse(c=>{c.userData.act='cashier'});
+ return {g,head,eyes,armL,lolli,torso,anchor:new THREE.Vector3(0,.32,0)}})();
+let rig=null;
+async function loadCashier(){const gl=await loadGLB(MODELS.cashier);if(!gl)return;
+ cashier.g.visible=false;const s=gl.scene;s.position.copy(cashier.g.position);s.quaternion.copy(cashier.g.quaternion);scene.add(s);s.traverse(c=>{c.userData.act='cashier'});
+ const mixer=new THREE.AnimationMixer(s),acts={};gl.animations.forEach(a=>{acts[a.name.toLowerCase()]=mixer.clipAction(a)});
+ const head=s.getObjectByName('Head')||s.getObjectByName('head');
+ rig={mixer,acts,head,base:head?head.quaternion.clone():null,cur:null,scene:s};playClip('idle')}
+function playClip(name,once){if(!rig)return;const a=rig.acts[name];if(!a||rig.cur===a)return;a.reset();a.setLoop(once?THREE.LoopOnce:THREE.LoopRepeat);a.clampWhenFinished=!!once;a.fadeIn(.35).play();if(rig.cur)rig.cur.fadeOut(.35);rig.cur=a}
+
+/* ---------- state ---------- */
+let CAM={xL:.9,xR:18.2,y:1.5,z:5.2},ROOM={x0:-1.6,x1:22,z1:7.6},COUNTERBOX=null,ZONES=[],X_MIN=.9,X_MAX=18.2,VIEW_H=2.6;
+let storeRoot=null,dyn=[];
+const P={},pickables=[],flames=[],swaying=[];
+let x=2,v=0,glide=null,btnDir=0,keyDir=0,yawT=0,pitchT=0,yaw=0,pitch=0,fov0=28,xStart=2.1;
+let fontsReady=false,entered=false,hiddenNow=false,sel=null,tourStep=-1,drag=null,pmx=0,pmy=0,hoverOn=false,ready=false;
+let lookT=0,awayT=0,noticed=false,noticeAt=0;
+const active=new Set(),bag=new Map();
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),tmp=new THREE.Vector3(),tmp2=new THREE.Vector3(),clock=new THREE.Clock();
+const sheetOpen=()=>!$('#sheet').hidden;
+
+/* ---------- products placed on slot empties ---------- */
+function tagAt(e,parent,w,h,x,y,z,rx){const t=plane(w,h,tagTex(e.p));at(t,x,y,z);if(rx)t.rotation.x=rx;parent.add(t);e.parts.push(t)}
+function hangAt(a,p){
+ const e={p,parts:[],type:'hang',pop:0,ang:0,anchor:a};
+ const hook=cyl(.004,.004,.24,METAL,8);hook.rotation.x=Math.PI/2;a.add(at(hook,0,0,.12));a.add(at(box(.03,.03,.01,METAL),0,0,.005));
+ const n=Math.min(p.stock,a.userData.units||4);
+ if(n>0){const item=makeItem(p),{b,s}=measure(item),cw=Math.max(s.x+.05,.15),ch=s.y+.16;
+  const cardM=mat(0xf3dfe0,{roughness:.75}),boxM=mat(0xd9b9be,{roughness:.7});
+  for(let k=n-1;k>=1;k--){const pk=box(cw,ch,.028,boxM);a.add(at(pk,0,-.012-ch/2,.215-k*.034));e.parts.push(pk)}
+  const u=new THREE.Group();a.add(at(u,0,0,.225));u.add(at(box(cw,ch,.003,cardM),0,-.012-ch/2,0));
+  item.position.set(-(b.min.x+b.max.x)/2,-.045-s.y-b.min.y,.0035-b.min.z);u.add(item);e.hero=item;e.base=item.position.clone();e.parts.push(u.children[0],item);swaying.push(u);
+  tagAt(e,u,.14,.065,0,-.012-ch+.045,.004)}
+ else tagAt(e,a,.16,.075,0,-.15,.01);
+ return e}
+function standAt(a,p){
+ const e={p,parts:[],type:'stand',pop:0,ang:0,anchor:a};
+ const spread=a.userData.spread==='x'?'x':'z',n=Math.min(p.stock,a.userData.units||3);
+ const item=makeItem(p),{b,s}=measure(item),step=(spread==='x'?s.x:s.z)+.012,heroK=spread==='x'?Math.floor((n-1)/2):0;
+ for(let k=0;k<n;k++){const it=k?item.clone():item,off=spread==='x'?(k-(n-1)/2)*step:0,dz=spread==='z'?-k*step:0;
+  it.position.set(off-(b.min.x+b.max.x)/2,-b.min.y,dz-(b.min.z+b.max.z)/2);a.add(it);e.parts.push(it);if(k===heroK){e.hero=it;e.base=it.position.clone()}}
+ tagAt(e,a,.13,.06,0,.03,s.z/2+.04,-.35);
+ return e}
+
+/* ---------- build everything from the .glb ---------- */
+function clearStore(){if(storeRoot)scene.remove(storeRoot);dyn.forEach(o=>scene.remove(o));dyn=[];Object.keys(P).forEach(k=>delete P[k]);
+ pickables.length=0;flames.length=0;swaying.length=0;active.clear();sel=null}
+function setupStore(gl){
+ clearStore();storeRoot=gl.scene;scene.add(storeRoot);storeRoot.updateMatrixWorld(true);
+ const named={},all=[];storeRoot.traverse(o=>{const n=baseName(o.name);o.userData.base=n;all.push(o);if(!named[n])named[n]=o});
+ const wp=o=>o.getWorldPosition(new THREE.Vector3());
+ if(named.cam_left&&named.cam_right){const l=wp(named.cam_left),r=wp(named.cam_right);CAM={xL:l.x,xR:r.x,y:l.y,z:l.z}}
+ const bb=new THREE.Box3().setFromObject(storeRoot);ROOM={x0:bb.min.x,x1:bb.max.x,z1:bb.max.z};
+ if(named.cashier_seat){cashier.g.position.copy(wp(named.cashier_seat));cashier.g.quaternion.copy(named.cashier_seat.getWorldQuaternion(new THREE.Quaternion()))}
+ if(rig){rig.scene.position.copy(cashier.g.position);rig.scene.quaternion.copy(cashier.g.quaternion)}
+ const cb=named.counter_body||named.counter_top;COUNTERBOX=cb?new THREE.Box3().setFromObject(cb):null;
+ /* patterns painted onto plain materials by name (Blender textures win if you add them) */
+ const PAINT={floor:[[1,1],g=>{for(let i=0;i<4;i++)for(let j=0;j<4;j++){g.fillStyle=(i+j)%2?'#2c0f19':'#46202c';g.fillRect(i*32,j*32,32,32)}},128,128],
+  pegboard:[[23,22],g=>{g.fillStyle='#3c1824';g.fillRect(0,0,64,64);g.fillStyle='#16080d';g.beginPath();g.arc(32,32,7,0,7);g.fill()},64,64],
+  slatwall:[[1,20],g=>{g.fillStyle='#262a3c';g.fillRect(0,0,32,64);g.fillStyle='#0e0f18';g.fillRect(0,26,32,12)},32,64]};
+ const painted=new Set();
+ all.forEach(o=>{const m=o.material;if(!o.isMesh||!m||Array.isArray(m)||m.map||painted.has(m))return;const f=PAINT[baseName(m.name)];if(!f)return;
+  const t=tex(f[2],f[3],f[1],false);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(f[0][0],f[0][1]);m.map=t;m.color.set(0xffffff);m.needsUpdate=true;painted.add(m)});
+ /* zones */
+ ZONES=all.filter(o=>o.userData.base.startsWith('zone_')).map(o=>{const id=o.userData.base.slice(5);return {id,x:wp(o).x,name:(CATS[id]&&CATS[id].name)||id}}).sort((a,b)=>a.x-b.x);
+ ZONES.forEach((z,i)=>{z.x0=i?(ZONES[i-1].x+z.x)/2:ROOM.x0;z.x1=i<ZONES.length-1?(z.x+ZONES[i+1].x)/2:ROOM.x1});
+ /* signs */
+ all.filter(o=>o.userData.base.startsWith('sign_')).forEach(o=>{
+  const m=o.isMesh?o:o.getObjectByProperty('isMesh',true);if(!m)return;
+  const [key,style='board']=o.userData.base.slice(5).split('__');
+  const t=CATS[key]?[CATS[key].name,CATS[key].sub]:(SIGN_TEXT[key]||[key,'']);
+  m.geometry.computeBoundingBox();const gb=m.geometry.boundingBox,ws=m.getWorldScale(new THREE.Vector3());
+  const w=Math.max(.01,(gb.max.x-gb.min.x)*ws.x),h=Math.max(.01,Math.hypot(gb.max.y-gb.min.y,gb.max.z-gb.min.z)*ws.y);
+  const ch=256,cw=Math.round(clamp(w/h*ch,64,2048));
+  const col=(CATS[key]&&CATS[key].neon)||'#ff5fa2';
+  m.material=new THREE.MeshBasicMaterial({map:tex(cw,ch,signDraw(style,t[0],t[1],col),false),transparent:true,toneMapped:false,side:THREE.DoubleSide});
+  if(key==='counter'){m.userData.act='counter';pickables.push(m)}});
+ /* counter is clickable */
+ all.filter(o=>o.isMesh&&/^counter_/.test(o.userData.base)).forEach(o=>{o.userData.act='counter';pickables.push(o)});
+ /* product slots */
+ all.filter(o=>!o.isMesh&&/^(hang|stand)_/.test(o.userData.base)).forEach(a=>{
+  const [kind,...rest]=a.userData.base.split('_'),id=rest.join('_'),p=PROD[id];if(!p||P[id])return;
+  const e=kind==='hang'?hangAt(a,p):standAt(a,p);e.parts.forEach(o=>o.traverse(c=>{c.userData.pid=id;c.userData.act=undefined}));pickables.push(...e.parts);P[id]=e});
+ storeRoot.traverse(o=>{if(o.name==='flame')flames.push(o)});
+ /* lights from empties */
+ all.filter(o=>/^spot_/.test(o.userData.base)).forEach(o=>{const p=wp(o),l=new THREE.SpotLight(0xffe2d0,2.5,12,.55,.7,1.3);l.position.copy(p);l.target.position.set(p.x,1.2,0);scene.add(l,l.target);dyn.push(l,l.target)});
+ all.filter(o=>/^point_/.test(o.userData.base)).forEach(o=>{const l=new THREE.PointLight(0xffd0c0,.9,4.5,2);l.position.copy(wp(o));scene.add(l);dyn.push(l)});
+ /* merge the static set by material: far fewer draw calls on phones */
+ if(THREE.BufferGeometryUtils){const groups=new Map(),keep=new Set();
+  pickables.forEach(o=>o.traverse(c=>keep.add(c)));
+  all.forEach(o=>{if(!o.isMesh||keep.has(o)||o.userData.base.startsWith('sign_')||Array.isArray(o.material))return;let a=o.parent,inSlot=false;while(a){if(/^(hang|stand)_/.test(a.userData.base||''))inSlot=true;a=a.parent}if(inSlot)return;
+   if(!groups.has(o.material))groups.set(o.material,[]);groups.get(o.material).push(o)});
+  groups.forEach((list,m)=>{if(list.length<2)return;try{
+   const geos=list.map(o=>{let g=o.geometry.clone();if(g.index)g=g.toNonIndexed();g.applyMatrix4(o.matrixWorld);
+    Object.keys(g.attributes).forEach(k=>{if(!['position','normal','uv'].includes(k))g.deleteAttribute(k)});
+    if(!g.attributes.normal)g.computeVertexNormals();if(!g.attributes.uv)g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2),2));return g});
+   const merged=THREE.BufferGeometryUtils.mergeBufferGeometries(geos);if(!merged)return;
+   const mm=new THREE.Mesh(merged,m);mm.name='merged_'+(m.name||'mat');scene.add(mm);dyn.push(mm);list.forEach(o=>{o.visible=false})}catch(err){console.warn('merge skipped',err)}})}
+ X_MIN=CAM.xL;X_MAX=CAM.xR;buildMap();layout();x=xStart;v=0;glide=null;
+ const tb=$('#tourBtn');ready=true;if(fontsReady){tb.disabled=false;tb.textContent='I’m 18+ — show me around';$('#skipBtn').disabled=false}}
+
+/* ---------- framing: long lens, adapts to screen shape ---------- */
+function layout(){const w=innerWidth,h=innerHeight,a=w/h;renderer.setSize(w,h,false);camera.aspect=a;
+ const H=a>=1?VIEW_H:Math.min(5.2,2.3/a);fov0=2*Math.atan(H/2/CAM.z)*180/Math.PI;
+ const cz=cashier.g.position.z,Wc=H*a*(CAM.z-cz)/CAM.z;xStart=clamp(cashier.g.position.x+.3*Wc,X_MIN,X_MAX);camera.updateProjectionMatrix()}
+addEventListener('resize',layout);
+
+/* ---------- floor-plan map ---------- */
+const MW=560,MH=62;let mx=xx=>xx,mz=z=>z,meEl=null,coneEl=null,zoneEls=[];
+function buildMap(){
+ mx=xx=>8+(xx-ROOM.x0)/(ROOM.x1-ROOM.x0)*(MW-16);mz=z=>8+clamp(z/ROOM.z1,0,1)*30;
+ const cb=COUNTERBOX?`<rect x="${mx(COUNTERBOX.min.x)}" y="${mz(COUNTERBOX.min.z)}" width="${mx(COUNTERBOX.max.x)-mx(COUNTERBOX.min.x)}" height="${Math.max(2,mz(COUNTERBOX.max.z)-mz(COUNTERBOX.min.z))}" rx="2" fill="rgba(201,164,106,.5)"/>`:'';
+ $('#map').innerHTML=`<svg viewBox="0 0 ${MW} ${MH}" role="img" aria-label="Floor plan"><rect x="8" y="8" width="${MW-16}" height="30" rx="5" fill="rgba(255,255,255,.03)" stroke="rgba(233,168,178,.35)"/>${cb}
+${ZONES.map(z=>`<g class="zone" data-z="${esc(z.id)}"><rect x="${mx(z.x0)}" y="0" width="${mx(z.x1)-mx(z.x0)}" height="${MH}" fill="transparent"/><rect class="bar" x="${mx(z.x0)+3}" y="8" width="${Math.max(2,mx(z.x1)-mx(z.x0)-6)}" height="4" rx="2"/><text x="${(mx(z.x0)+mx(z.x1))/2}" y="${MH-6}">${esc(z.name)}</text></g>`).join('')}
+<g id="me"><path id="cone" fill="rgba(255,95,162,.35)"/><circle r="4.5" fill="#ff5fa2" stroke="#fff" stroke-width="1.5"/></g></svg>`;
+ meEl=$('#me');coneEl=$('#cone');zoneEls=[...document.querySelectorAll('.zone')]}
+$('#map').addEventListener('click',e=>{const z=e.target.closest('.zone');if(!z)return;const zz=ZONES.find(q=>q.id===z.dataset.z);if(!zz)return;closeSheet();glide=clamp(zz.x,X_MIN,X_MAX)});
+
+/* ---------- walking ---------- */
+function stepTo(d){const stops=ZONES.map(z=>clamp(z.x,X_MIN,X_MAX));const next=d>0?stops.find(s=>s>x+.3):[...stops].reverse().find(s=>s<x-.3);if(next!==undefined)glide=next}
+function bindArrow(el,d){let t0=0;
+ el.addEventListener('pointerdown',e=>{e.preventDefault();if(!entered||sheetOpen())return;t0=performance.now();btnDir=d;el.classList.add('held');try{el.setPointerCapture(e.pointerId)}catch(_){}});
+ const end=()=>{el.classList.remove('held');if(!btnDir)return;const held=performance.now()-t0;btnDir=0;if(held<220)stepTo(d)};
+ el.addEventListener('pointerup',end);el.addEventListener('pointercancel',()=>{btnDir=0;el.classList.remove('held')});
+ el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();stepTo(d)}})}
+bindArrow($('#goL'),-1);bindArrow($('#goR'),1);
+
+/* ---------- looking: half-turn either way, never behind you ---------- */
+const YAW_MAX=1.45,PITCH_MIN=-.42,PITCH_MAX=.5;
+canvas.addEventListener('pointerdown',e=>{if(!entered||hiddenNow)return;drag={x:e.clientX,y:e.clientY,t:performance.now(),moved:0};canvas.classList.add('grabbing');try{canvas.setPointerCapture(e.pointerId)}catch(_){}});
+canvas.addEventListener('pointermove',e=>{pmx=e.clientX;pmy=e.clientY;hoverOn=e.pointerType==='mouse';
+ if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;drag.moved+=Math.abs(dx)+Math.abs(dy);
+ if(drag.moved>5){const k=(camera.fov*Math.PI/180)/innerHeight;yawT=clamp(yawT+dx*k,-YAW_MAX,YAW_MAX);pitchT=clamp(pitchT+dy*k,PITCH_MIN,PITCH_MAX);$('#tip').hidden=true;if(tourStep===1)nextTour()}});
+canvas.addEventListener('pointerup',e=>{canvas.classList.remove('grabbing');if(drag&&drag.moved<7&&performance.now()-drag.t<450)pick(e.clientX,e.clientY);drag=null});
+canvas.addEventListener('pointercancel',()=>{drag=null;canvas.classList.remove('grabbing')});
+canvas.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'){hoverOn=false;$('#tip').hidden=true}});
+$('#frontBtn').addEventListener('click',()=>{yawT=0;pitchT=0});
+const KEYS={ArrowLeft:-1,a:-1,A:-1,ArrowRight:1,d:1,D:1};
+addEventListener('keydown',e=>{if(e.key==='Escape'){closeSheet();return}if(e.key==='q'||e.key==='Q'){toggleHide(!hiddenNow);return}
+ if(KEYS[e.key]&&entered&&!sheetOpen()){keyDir=KEYS[e.key];e.preventDefault()}});
+addEventListener('keyup',e=>{if(KEYS[e.key]===keyDir)keyDir=0});
+addEventListener('blur',()=>{keyDir=0;btnDir=0});
+
+function hit(cx,cy){ndc.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);ray.setFromCamera(ndc,camera);
+ const hs=ray.intersectObjects([...pickables,cashier.g,...(rig?[rig.scene]:[])],true);
+ for(const h of hs){if(h.distance>14)break;if(!h.object.visible)continue;const u=h.object.userData;if(u.pid&&P[u.pid])return u;if(typeof u.act==='string')return u}return null}
+function pick(cx,cy){if(!entered||hiddenNow||sheetOpen())return;const u=hit(cx,cy);if(!u)return;if(u.pid)openProduct(u.pid);else openCheckout(u.act==='cashier'?'contact':'bag')}
+
+/* ---------- product sheet + live viewer ---------- */
+let vr=null,vs,vcam,vgrp,vItem=null,vKind='',vMotion=false,vDrag=null,vRotY=.5,vRotX=.12,vZoom=1,vFit=1,vCenterY=0,vW=0,vH=0,vRipples=[];
+function viewerInit(){
+ vr=new THREE.WebGLRenderer({canvas:$('#vc'),antialias:true,alpha:true});vr.setPixelRatio(Math.min(devicePixelRatio||1,2));vr.outputEncoding=THREE.sRGBEncoding;vr.toneMapping=THREE.ACESFilmicToneMapping;
+ vs=new THREE.Scene();vs.add(new THREE.HemisphereLight(0xfff0ea,0x3a1a24,.95));const k=new THREE.DirectionalLight(0xffffff,1.1);k.position.set(1,2,2);vs.add(k);const r=new THREE.DirectionalLight(0xff9cc0,.7);r.position.set(-2,1,-1.5);vs.add(r);
+ vcam=new THREE.PerspectiveCamera(30,1,.005,20);
+ const grid=new THREE.GridHelper(.6,12,0xc9a46a,0x6b3a48);grid.material.transparent=true;grid.material.opacity=.55;vs.add(grid);
+ const vc=$('#vc');
+ vc.addEventListener('pointerdown',e=>{vDrag={x:e.clientX,y:e.clientY};try{vc.setPointerCapture(e.pointerId)}catch(_){}});
+ vc.addEventListener('pointermove',e=>{if(!vDrag)return;vRotY+=(e.clientX-vDrag.x)*.01;vRotX=clamp(vRotX+(e.clientY-vDrag.y)*.006,-.5,.9);vDrag.x=e.clientX;vDrag.y=e.clientY});
+ vc.addEventListener('pointerup',()=>{vDrag=null});vc.addEventListener('pointercancel',()=>{vDrag=null});
+ vc.addEventListener('wheel',e=>{e.preventDefault();vZoom=clamp(vZoom*(e.deltaY>0?1.08:.92),.55,1.8)},{passive:false})}
+function dimLabel(text,hgt){const t=tex(320,96,(g,w,h)=>{g.fillStyle='rgba(26,9,15,.85)';rrect(g,2,2,w-4,h-4,40);g.fill();g.fillStyle='#f1dfc3';g.font='500 52px Jost';g.textAlign='center';g.fillText(text,w/2,66)});
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,toneMapped:false}));s.scale.set(hgt*3.33,hgt,1);s.renderOrder=3;return s}
+function dimLine(a,b,label,off,hgt,grp){const m=new THREE.LineBasicMaterial({color:0xc9a46a,depthTest:false,transparent:true});
+ const pts=[a,b];const geo=new THREE.BufferGeometry().setFromPoints(pts);const l=new THREE.Line(geo,m);l.renderOrder=2;grp.add(l);
+ [a,b].forEach(p=>{const tk=new THREE.Line(new THREE.BufferGeometry().setFromPoints([p.clone().addScaledVector(off,-.6),p.clone().addScaledVector(off,.6)]),m);tk.renderOrder=2;grp.add(tk)});
+ const s=dimLabel(label,hgt);s.position.copy(a).add(b).multiplyScalar(.5).addScaledVector(off,1.6);grp.add(s)}
+function viewerShow(p){
+ if(!vr)viewerInit();
+ if(vgrp){vs.remove(vgrp)}
+ vgrp=new THREE.Group();vs.add(vgrp);vItem=makeItem(p);vKind=ANIM[p.kind]||'';
+ const {b,s}=measure(vItem);vItem.position.set(-(b.min.x+b.max.x)/2,-b.min.y,-(b.min.z+b.max.z)/2);vgrp.add(vItem);
+ const m=Math.max(s.x,s.y,s.z),gap=m*.12+.006,lh=Math.max(.012,m*.075),cm=v=>(v*100).toFixed(1)+' cm';
+ const hx=s.x/2+gap,hz=s.z/2+gap;
+ dimLine(new THREE.Vector3(-hx,0,0),new THREE.Vector3(-hx,s.y,0),cm(s.y),new THREE.Vector3(-gap*.25,0,0),lh,vgrp);
+ dimLine(new THREE.Vector3(-s.x/2,.001,hz),new THREE.Vector3(s.x/2,.001,hz),cm(s.x),new THREE.Vector3(0,0,gap*.25),lh,vgrp);
+ dimLine(new THREE.Vector3(hx,.001,-s.z/2),new THREE.Vector3(hx,.001,s.z/2),cm(s.z),new THREE.Vector3(gap*.25,0,0),lh,vgrp);
+ vRipples=[];
+ if(vKind==='buzz'){for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(Math.max(s.x,s.z)*.6,.0015,6,48),new THREE.MeshBasicMaterial({color:0xff7fb0,transparent:true,opacity:0,toneMapped:false}));r.rotation.x=Math.PI/2;r.position.y=s.y*.75;vgrp.add(r);vRipples.push(r)}}
+ vFit=m*2.6+.12;vCenterY=s.y*.45;vRotY=.5;vRotX=.12;vZoom=1;vMotion=false;
+ $('#motionBtn').hidden=!(vKind==='buzz'||vKind==='roll');$('#motionBtn').classList.remove('on');$('#motionBtn').textContent='Preview motion';
+ $('#pDims').innerHTML=[['Height',s.y],['Width',s.x],['Depth',s.z]].map(([k,v])=>`<div>${k}<b>${cm(v)}</b></div>`).join('')}
+$('#motionBtn').addEventListener('click',()=>{vMotion=!vMotion;$('#motionBtn').classList.toggle('on',vMotion);$('#motionBtn').textContent=vMotion?'Stop motion':'Preview motion'});
+function viewerFrame(t,dt){
+ if(!vr||!vgrp)return;const c=$('#vc'),w=c.clientWidth,h=c.clientHeight;if(!w||!h)return;
+ if(w!==vW||h!==vH){vW=w;vH=h;vr.setSize(w,h,false);vcam.aspect=w/h;vcam.updateProjectionMatrix()}
+ if(!vDrag&&!reduce)vRotY+=dt*.35;
+ vgrp.rotation.y=vRotY;
+ const d=vFit*vZoom;vcam.position.set(0,vCenterY+Math.sin(vRotX)*d,Math.cos(vRotX)*d);vcam.lookAt(0,vCenterY,0);
+ if(vMotion&&vKind==='buzz'){vItem.rotation.z=Math.sin(t*90)*.012;vRipples.forEach((r,i)=>{const ph=(t*1.4+i/3)%1;r.scale.setScalar(.6+ph*1.2);r.material.opacity=(1-ph)*.6})}
+ else{vItem.rotation.z=0;vRipples.forEach(r=>{r.material.opacity=0})}
+ if(vKind==='roll'){const r=vItem.getObjectByName('spin');if(r&&vMotion)r.rotation.x+=dt*4}
+ vItem.traverse(o=>{if(o.name==='flame')o.scale.y=1+.18*Math.sin(t*14)+.08*Math.sin(t*31)});
+ vr.render(vs,vcam)}
+
+let qty=1;
+function openProduct(id){
+ const e=P[id];if(!e)return;const p=e.p,cat=CATS[p.cat]||{name:p.cat,sub:''};
+ sel=id;active.add(e);
+ view('product');$('#sheet').hidden=false;$('#tip').hidden=true;
+ $('#pCat').textContent=cat.name+' · '+cat.sub;$('#pName').textContent=p.name;$('#pPrice').textContent=rupee(p.price);
+ const [t]=stockInfo(p.stock);$('#pStock').textContent=t;$('#pBar').style.width=Math.min(100,p.stock/25*100)+'%';
+ $('#pDesc').textContent=p.desc;$('#pSize').textContent=p.size;qty=1;refreshBuy();viewerShow(p);
+ /* slide the store so the product sits in the open space beside the sheet */
+ const tgt=e.hero||e.parts[e.parts.length-1];tgt.updateWorldMatrix(true,true);const c=measure(tgt).b.getCenter(tmp);
+ if(innerWidth>700){const f=$('#sheet').offsetWidth/innerWidth,H=2*(CAM.z-c.z)*Math.tan(fov0*Math.PI/360);glide=clamp(c.x+f*H*camera.aspect/2,X_MIN,ROOM.x1-.5)}else glide=clamp(c.x,X_MIN,X_MAX);
+ yawT=0;pitchT=0;if(tourStep>=0)endTour()}
+function refreshBuy(){const e=P[sel];if(!e)return;const inBag=bag.get(sel)||0,left=e.p.stock-inBag;qty=clamp(qty,1,Math.max(1,left));$('#qN').textContent=qty;
+ const add=$('#addBtn');add.disabled=left<=0;add.textContent=e.p.stock===0?'Sold out':left<=0?'All in your bag':inBag?`Add ${qty} more`:`Add ${qty} to bag`;$('#buyNow').disabled=e.p.stock===0}
+$('#qMinus').addEventListener('click',()=>{qty--;refreshBuy()});$('#qPlus').addEventListener('click',()=>{qty++;refreshBuy()});
+$('#addBtn').addEventListener('click',()=>{if(!sel)return;const p=P[sel].p,inBag=bag.get(sel)||0;bag.set(sel,Math.min(p.stock,inBag+qty));qty=1;renderBag();refreshBuy()});
+$('#buyNow').addEventListener('click',()=>{if(!sel)return;const p=P[sel].p;if(!bag.get(sel))bag.set(sel,Math.min(p.stock,qty));renderBag();openCheckout('bag')});
+function view(name){document.querySelectorAll('[data-view]').forEach(s=>s.hidden=s.dataset.view!==name);$('#toCheckout').hidden=name==='checkout'}
+function tab(name){document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));document.querySelectorAll('[data-pane]').forEach(p=>p.hidden=p.dataset.pane!==name)}
+document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
+function openCheckout(name){view('checkout');tab(name);$('#sheet').hidden=false;$('#tip').hidden=true;bubbleHide();if(tourStep>=0)endTour()}
+function closeSheet(){$('#sheet').hidden=true;sel=null}
+$('#backBtn').addEventListener('click',closeSheet);$('#toCheckout').addEventListener('click',()=>openCheckout('bag'));
+$('#bagBtn').addEventListener('click',()=>{glide=clamp(cashier.g.position.x+.6,X_MIN,X_MAX);openCheckout('bag')});
+function renderBag(){let n=0,tot=0;const rows=[];
+ bag.forEach((q,id)=>{const p=P[id].p;n+=q;tot+=q*p.price;rows.push(`<div class="line"><span>${esc(p.name)}</span><span class="qty"><button data-q="-1" data-id="${esc(id)}" aria-label="One fewer">−</button>${q}<button data-q="1" data-id="${esc(id)}" aria-label="One more">+</button></span><span class="amt">${rupee(q*p.price)}</span></div>`)});
+ $('#bagList').innerHTML=rows.length?rows.join(''):'<p class="note">Your bag is empty. Walk the shelves and pick something up.</p>';
+ $('#bagTotal').textContent=rupee(tot);$('#bagN').textContent=n;$('#bagN2').textContent=n;$('#placeBtn').disabled=!n}
+$('#bagList').addEventListener('click',e=>{const b=e.target.closest('button[data-q]');if(!b)return;const id=b.dataset.id,p=P[id].p;
+ const q=clamp((bag.get(id)||0)+Number(b.dataset.q),0,p.stock);if(q)bag.set(id,q);else bag.delete(id);renderBag();refreshBuy()});
+$('#placeBtn').addEventListener('click',async()=>{const lines=[];let tot=0;bag.forEach((q,id)=>{const p=P[id].p;tot+=q*p.price;lines.push(`${q} × ${p.name} — ${rupee(q*p.price)}`)});
+ const text=`Kukai order\n${lines.join('\n')}\nTotal ${rupee(tot)}`;let copied=false;try{await navigator.clipboard.writeText(text);copied=true}catch(_){}
+ $('#placeNote').innerHTML='Preview only — payments connect when the store goes live.'+(copied?' Order summary copied.':'')+(CONFIG.whatsapp?` <a href="https://wa.me/${encodeURIComponent(CONFIG.whatsapp)}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">Send on WhatsApp</a>`:'')});
+$('#contactBody').innerHTML=`<p>Website: <a href="${esc(CONFIG.site)}" target="_blank" rel="noopener">${esc(CONFIG.siteLabel)}</a></p>`+
+ (CONFIG.email?`<p>Email: ${esc(CONFIG.email)}</p>`:'')+(CONFIG.whatsapp?`<p>WhatsApp: ${esc(CONFIG.whatsapp)}</p>`:'')+(CONFIG.instagram?`<p>Instagram: ${esc(CONFIG.instagram)}</p>`:'')+
+ (CONFIG.email||CONFIG.whatsapp?'':'<p class="note">Email and WhatsApp go here before launch.</p>');
+renderBag();
+
+
+
+/* ---------- speech bubble ---------- */
+const bubble=$('#bubble');let bubbleText='';
+function bubbleSay(html,key){if(bubbleText!==key){bubble.innerHTML=html;bubbleText=key;bubble.hidden=false;bubble.classList.remove('pop');void bubble.offsetWidth;bubble.classList.add('pop')}}
+function bubbleHide(){bubble.hidden=true;bubbleText=''}
+bubble.addEventListener('click',e=>{const b=e.target.closest('button');if(b){if(b.dataset.a==='next')nextTour();else endTour();return}if(tourStep<0)openCheckout('contact')});
+function placeBubble(){const w=cashier.head.getWorldPosition(tmp2).add(cashier.anchor);w.project(camera);
+ if(w.z>1||Math.abs(w.x)>1.15||Math.abs(w.y)>1.15){if(tourStep<0){bubble.style.opacity='0';return}}
+ bubble.style.opacity='1';let px=(w.x+1)/2*innerWidth,py=(1-w.y)/2*innerHeight;const bw=bubble.offsetWidth/2;
+ const cx=clamp(px,bw+10,innerWidth-bw-10);py=clamp(py,bubble.offsetHeight+70,innerHeight-20);bubble.style.left=cx+'px';bubble.style.top=py+'px';bubble.style.setProperty('--tail',clamp(50+(px-cx)/(bw*2)*100,12,88)+'%')}
+
+/* ---------- intro tour (the cashier points things out) ---------- */
+const TOUR=[
+ ['Hey. Hold the arrows — or ← → keys — to walk the shelves.','arrows'],
+ ['Drag or swipe anywhere to look around without moving. Go on, try it.','drag'],
+ ['See something? Tap it and I’ll bring it up close, real size.','product']];
+function showTour(){const [t]=TOUR[tourStep];bubbleSay(`${esc(t)}<div class="row"><button class="yes" data-a="next">${tourStep<TOUR.length-1?'Next':'Got it'}</button><button data-a="skip">Skip</button></div>`,'tour'+tourStep);
+ $('#goL').classList.toggle('pulse',TOUR[tourStep][1]==='arrows');$('#goR').classList.toggle('pulse',TOUR[tourStep][1]==='arrows');
+ $('#dragDemo').hidden=TOUR[tourStep][1]!=='drag';$('#ring').hidden=TOUR[tourStep][1]!=='product';playClip(tourStep===0||tourStep===2?'point':'idle')}
+function nextTour(){tourStep++;if(tourStep>=TOUR.length)endTour();else showTour()}
+function endTour(){tourStep=-1;bubbleHide();$('#goL').classList.remove('pulse');$('#goR').classList.remove('pulse');$('#dragDemo').hidden=true;$('#ring').hidden=true;playClip('idle');setHint()}
+function enter(tour){$('#gate').hidden=true;entered=true;if(tour){tourStep=0;showTour()}setHint()}
+$('#tourBtn').addEventListener('click',()=>enter(true));$('#skipBtn').addEventListener('click',()=>enter(false));
+function setHint(){const h=$('#hint');h.hidden=!entered||tourStep>=0;h.textContent=touchUI?'Arrows walk · swipe to look · tap a product':'← → walk · drag to look · click a product'}
+function toggleHide(on){hiddenNow=on;$('#cover').hidden=!on;if(on)$('#tip').hidden=true}
+$('#hideBtn').addEventListener('click',()=>toggleHide(true));$('#cover').addEventListener('click',()=>toggleHide(false));$('#leaveBtn').addEventListener('click',()=>toggleHide(true));
+
+
+
+/* ---------- preview your own Blender export: drop a .glb on the page ---------- */
+const toast=$('#toast');let toastT=0;
+function say(msg){toast.textContent=msg;toast.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{toast.hidden=true},4200)}
+addEventListener('dragover',e=>{e.preventDefault()});
+addEventListener('drop',async e=>{e.preventDefault();const f=[...(e.dataTransfer.files||[])].find(f=>/\.glb$/i.test(f.name));if(!f){say('Drop a .glb file exported from Blender');return}
+ say('Loading '+f.name+'…');const gl=await parseGLB(await f.arrayBuffer());if(!gl){say('Could not read '+f.name);return}
+ setupStore(gl);say(`Previewing ${f.name} — ${Object.keys(P).length} products placed. Not saved: upload it to keep it.`)});
+
+/* ---------- loop ---------- */
+let frameN=0,lastZone='';
+const eul=new THREE.Euler(0,0,0,'YXZ'),gazeQ=new THREE.Quaternion(),gazeE=new THREE.Euler(0,0,0,'YXZ');
+let hYaw=0,hPitch=0,armT=0;
+const frontBtn=$('#frontBtn'),hintEl=$('#hint'),tipEl=$('#tip'),ringEl=$('#ring');
+function loop(){
+ requestAnimationFrame(loop);
+ const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+ const dir=(entered&&!sheetOpen()&&!hiddenNow)?(btnDir||keyDir):0;
+ if(dir){glide=null;if(tourStep===0)nextTour()}
+ const VMAX=1.35;let vT=dir*VMAX;
+ if(glide!==null){const d=glide-x;vT=clamp(d*1.3,-VMAX*1.6,VMAX*1.6);if(Math.abs(d)<.01&&Math.abs(v)<.04)glide=null}
+ v+=(vT-v)*(1-Math.exp(-dt*2.8));x+=v*dt;
+ const xmax=sheetOpen()?ROOM.x1-.5:X_MAX;if(x<X_MIN){x=X_MIN;v=Math.max(v,0)}if(x>xmax){x=xmax;v=Math.min(v,0)}
+ if(dir||glide!==null){const k=Math.exp(-dt*2.4);yawT*=k;pitchT*=k}
+ yaw+=(yawT-yaw)*(1-Math.exp(-dt*7));pitch+=(pitchT-pitch)*(1-Math.exp(-dt*7));
+ const wide=Math.min(Math.max(fov0,fov0*1.45),44),fov=fov0+(wide-fov0)*smooth((Math.abs(yaw)-.12)/1.1);
+ if(Math.abs(camera.fov-fov)>.01){camera.fov=fov;camera.updateProjectionMatrix()}
+ camera.position.set(x,CAM.y,CAM.z);eul.set(pitch,yaw,0);camera.quaternion.setFromEuler(eul);
+ frontBtn.hidden=!(entered&&!sheetOpen()&&(Math.abs(yawT)>.18||Math.abs(pitchT)>.15));
+ hintEl.style.opacity=frontBtn.hidden&&!sheetOpen()?'1':'0';
+ if(meEl){const hf=2*Math.atan(Math.tan(fov*Math.PI/360)*camera.aspect),L=16,tw=Math.tan(Math.min(hf/2,1.2))*L;
+  meEl.setAttribute('transform',`translate(${mx(x).toFixed(1)},${mz(CAM.z).toFixed(1)}) rotate(${(-yaw*180/Math.PI).toFixed(1)})`);coneEl.setAttribute('d',`M0 0L${-tw.toFixed(1)} -${L}L${tw.toFixed(1)} -${L}Z`)}
+ /* products */
+ flames.forEach((o,i)=>{o.scale.y=1+.18*Math.sin(t*14+i*2.1)+.08*Math.sin(t*31+i)});
+ if(!reduce)swaying.forEach((u,i)=>{u.rotation.z=Math.sin(t*.6+i*1.7)*.012});
+ active.forEach(e=>{if(!e.hero){active.delete(e);return}const tg=e.p.id===sel?1:0;e.pop+=(tg-e.pop)*(1-Math.exp(-dt*4));const h=e.hero;
+  h.position.copy(e.base);if(e.type==='hang')h.position.z+=e.pop*.08;else h.position.y+=e.pop*.02;
+  if(ANIM[e.p.kind]==='buzz'){h.position.x+=Math.sin(t*95)*.0008*e.pop;h.rotation.y=Math.sin(t*.9)*.5*e.pop}else{e.ang+=dt*.8*e.pop;h.rotation.y=e.ang}
+  if(tg===0&&e.pop<.002){h.position.copy(e.base);h.rotation.set(0,0,0);e.ang=0;active.delete(e)}});
+ /* cashier: idle, notice when stared at, Help? */
+ const hw=cashier.head.getWorldPosition(tmp2);const pr=hw.clone().project(camera);
+ const centred=entered&&!sheetOpen()&&tourStep<0&&pr.z<1&&Math.abs(pr.x)<.32&&Math.abs(pr.y)<.5;
+ if(centred){lookT+=dt;awayT=0}else{awayT+=dt;if(awayT>1.2){lookT=0;if(noticed){noticed=false;if(bubbleText==='help')bubbleHide();playClip('idle')}}}
+ if(!noticed&&lookT>2.2){noticed=true;noticeAt=t;playClip('notice',true)}
+ if(noticed&&t-noticeAt>.7&&tourStep<0&&!sheetOpen())bubbleSay('Help?','help');
+ const toCam=camera.position.clone().sub(hw);let gy=0,gp=0;
+ if(noticed||tourStep>=0){gy=clamp(Math.atan2(toCam.x,toCam.z),-1.1,1.1);gp=clamp(Math.atan2(toCam.y,Math.hypot(toCam.x,toCam.z)),-.4,.4)}
+ else{const glance=(t%11)>7.5;gy=glance?.35:Math.sin(t*.35)*.18-.05;gp=glance?-.35:Math.sin(t*.5)*.04}
+ hYaw+=(gy-hYaw)*(1-Math.exp(-dt*(noticed?5:2)));hPitch+=(gp-hPitch)*(1-Math.exp(-dt*(noticed?5:2)));
+ if(rig){if(rig.head)rig.head.quaternion.copy(rig.base);rig.mixer.update(dt);if(rig.head){gazeE.set(-hPitch,hYaw,0);gazeQ.setFromEuler(gazeE);rig.head.quaternion.multiply(gazeQ)}}
+ else{cashier.head.rotation.set(-hPitch,hYaw,0);cashier.torso.scale.y=1+.012*Math.sin(t*1.7);
+  cashier.eyes.scale.y=(t%4.3)<.12?.12:1;cashier.lolli.rotation.z=Math.sin(t*2.2)*.12;
+  armT+=(((tourStep===0||tourStep===2)?1:0)-armT)*(1-Math.exp(-dt*4));cashier.armL.rotation.z=armT*1.25;cashier.armL.rotation.x=-armT*.35}
+ if(!bubble.hidden)placeBubble();
+ if(tourStep===2){const e=PRODUCTS.map(p=>P[p.id]).find(e=>e&&e.hero);if(e){const w=measure(e.hero).b.getCenter(tmp).project(camera);ringEl.style.left=((w.x+1)/2*innerWidth)+'px';ringEl.style.top=((1-w.y)/2*innerHeight)+'px'}}
+ if(++frameN%5===0){
+  if(hoverOn&&!drag&&entered&&!sheetOpen()&&!hiddenNow){const u=hit(pmx,pmy);
+   if(u){tipEl.textContent=u.pid?`${P[u.pid].p.name} · ${rupee(P[u.pid].p.price)}`:u.act==='cashier'?'Ask for help':'Checkout';
+    tipEl.style.left=Math.min(innerWidth-240,pmx+16)+'px';tipEl.style.top=(pmy+18)+'px';tipEl.hidden=false;canvas.classList.add('point')}
+   else{tipEl.hidden=true;canvas.classList.remove('point')}}
+  let cur=ZONES.length?ZONES[0].id:'';ZONES.forEach(z=>{if(x-yaw*2>=z.x0)cur=z.id});
+  if(cur!==lastZone){lastZone=cur;zoneEls.forEach(el=>el.classList.toggle('on',el.dataset.z===cur))}}
+ renderer.render(scene,camera);
+ if(sheetOpen()&&!$('[data-view="product"]').hidden)viewerFrame(t,dt);
+}
+loop();loadCashier();
+
+/* fonts, then the store */
+await Promise.race([Promise.all(['40px Marcellus','italic 40px Marcellus','300 40px Jost','500 40px Jost','500 40px Caveat'].map(f=>document.fonts.load(f))),new Promise(r=>setTimeout(r,3000))]);
+fontsReady=true;TEXS.forEach(q=>{q.g.clearRect(0,0,q.w,q.h);q.draw(q.g,q.w,q.h);q.t.needsUpdate=true});
+let gl=await loadGLB(MODELS.store);
+if(!gl&&window.KUKAI_STORE_B64){const s=atob(window.KUKAI_STORE_B64),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);gl=await parseGLB(u.buffer)}
+if(gl){setupStore(gl);$('#tourBtn').focus()}
+else{const tb=$('#tourBtn');tb.textContent='Store model not found';$('#gateNote').hidden=false}
+})();
+
+</script>
+</body>
+</html>
